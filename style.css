@@ -66,3 +66,14 @@ button:hover {
     border-radius: 5px;       /* 모서리 둥글게 */
     margin-bottom: 10px;      /* ★핵심! 아래쪽 줄과 10px 간격 띄우기 */
 }
+
+/* 완료된 할 일에 적용할 디자인 */
+.done {
+    text-decoration: line-through; /* 글자 중간에 줄 긋기 */
+    color: #aaa;                   /* 글자색을 회색으로 */
+}
+
+/* 마우스 올렸을 때 클릭 가능하다는 느낌 주기 */
+#todo-list span {
+    cursor: pointer;
+}
