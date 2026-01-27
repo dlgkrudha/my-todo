@@ -1,89 +1,77 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+// 1. 파이어베이스 설정 (네 출입증)
+const firebaseConfig = {
+  apiKey: "AIzaSyCqj8MRt3mTierFo2y7dwVNIczMIEIa4kk",
+  authDomain: "my-first-todo-server.firebaseapp.com",
+  projectId: "my-first-todo-server",
+  storageBucket: "my-first-todo-server.firebasestorage.app",
+  messagingSenderId: "643667985855",
+  appId: "1:643667985855:web:444d298b565486c3c58d0a"
+};
+
+// 2. 연결 시작
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
 const todoInput = document.getElementById('todo-input');
 const addBtn = document.getElementById('add-btn');
 const todoList = document.getElementById('todo-list');
 
-// 1. 로드하기
-document.addEventListener('DOMContentLoaded', loadTodos);
-
-function loadTodos() {
-    const savedTodos = localStorage.getItem('mytodos');
+// 3. 화면에 할 일 하나를 그려주는 함수 (디자인 복구!)
+function printTodo(text) {
+    const li = document.createElement('li');
     
-    if (savedTodos) {
-        const parsedTodos = JSON.parse(savedTodos);
-        // 저장된 것들을 하나씩 화면에 그림
-        parsedTodos.forEach(function(todo) {
-            paintTodo(todo.text, todo.isDone); // 글자와 완료상태를 같이 넘김
+    // 글자 넣기
+    const span = document.createElement('span');
+    span.innerText = text;
+    
+    // 삭제 버튼 (아직 기능은 폼이야!)
+    const delBtn = document.createElement('button');
+    delBtn.innerText = '❌';
+
+    li.appendChild(span);
+    li.appendChild(delBtn);
+    todoList.appendChild(li);
+}
+
+// 4. [핵심] 사이트 접속하자마자 서버에서 데이터 가져오기!
+async function loadTodos() {
+    console.log("서버에서 로딩 중...");
+    
+    // 'todos' 컬렉션에 있는 모든 문서 가져오기
+    const querySnapshot = await getDocs(collection(db, "todos"));
+    
+    // 하나씩 꺼내서 화면에 그리기
+    querySnapshot.forEach((doc) => {
+        const data = doc.data(); // { text: "서버 테스트", isDone: false }
+        printTodo(data.text);
+    });
+    console.log("로딩 완료!");
+}
+
+// 5. 추가 버튼 클릭 이벤트
+addBtn.addEventListener('click', async function() {
+    const text = todoInput.value;
+    if (text === '') return;
+
+    try {
+        // 서버에 저장
+        await addDoc(collection(db, "todos"), {
+            text: text,
+            isDone: false
         });
-    }
-}
-
-// 2. 화면에 그리기 (매개변수 2개 받음: 텍스트, 완료여부)
-function paintTodo(text, isDone) {
-    const newLi = document.createElement('li');
-    const newSpan = document.createElement('span');
-    
-    newSpan.innerText = text;
-    
-    // 만약 저장된 상태가 "완료"라면, 줄 긋기 클래스 추가
-    if (isDone) {
-        newSpan.classList.add('done');
-    }
-
-    // ★ 핵심 기능: 글씨 클릭하면 완료 상태 토글(왔다갔다)
-    newSpan.addEventListener('click', function() {
-        newSpan.classList.toggle('done'); // 줄 긋기/없애기
-        saveTodos(); // 바뀐 상태 저장
-    });
-
-    const deleteBtn = document.createElement('button');
-    deleteBtn.innerText = "삭제";
-    deleteBtn.style.marginLeft = "10px";
-    deleteBtn.style.backgroundColor = "#ff4444"; 
-
-    deleteBtn.addEventListener('click', function() {
-        newLi.remove();
-        saveTodos();
-    });
-
-    newLi.appendChild(newSpan);
-    newLi.appendChild(deleteBtn);
-    todoList.appendChild(newLi);
-}
-
-// 3. 저장하기 (데이터 구조 변경!)
-function saveTodos() {
-    const allLi = todoList.querySelectorAll('li');
-    const todosArray = [];
-
-    allLi.forEach(function(li) {
-        const span = li.querySelector('span');
-        // 글자뿐만 아니라, 완료되었는지(done 클래스가 있는지)도 확인해서 객체로 만듦
-        const todoObj = {
-            text: span.innerText,
-            isDone: span.classList.contains('done') // true 또는 false
-        };
-        todosArray.push(todoObj);
-    });
-
-    localStorage.setItem('mytodos', JSON.stringify(todosArray));
-}
-
-// 4. 추가하기
-function addTodo() {
-    if (todoInput.value === '') {
-        alert('할 일을 입력해주세요!');
-        return;
-    }
-    // 처음 추가할 때는 완료 안 된 상태(false)로 시작
-    paintTodo(todoInput.value, false);
-    saveTodos();
-    todoInput.value = '';
-}
-
-addBtn.addEventListener('click', addTodo);
-
-todoInput.addEventListener('keypress', function(event) {
-    if (event.key === 'Enter') {
-        addTodo();
+        
+        // 화면에도 바로 추가 (새로고침 안 해도 뜨게)
+        printTodo(text);
+        
+        todoInput.value = '';
+    } catch (e) {
+        console.error("에러 발생: ", e);
+        alert("저장 실패 ㅠㅠ");
     }
 });
+
+// 사이트 켜지면 바로 로딩 시작!
+loadTodos();
