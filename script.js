@@ -1,7 +1,8 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getFirestore, collection, addDoc, getDocs, doc, deleteDoc, query, where } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-// ★ 인증 기능 불러오기 (새로 추가됨!)
-import { getAuth, signInWithRedirect, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+// getRedirectResult 추가됨!
+import { getAuth, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+
 const firebaseConfig = {
   apiKey: "AIzaSyCqj8MRt3mTierFo2y7dwVNIczMIEIa4kk",
   authDomain: "my-first-todo-server.firebaseapp.com",
@@ -11,12 +12,11 @@ const firebaseConfig = {
   appId: "1:643667985855:web:444d298b565486c3c58d0a"
 };
 
-// 앱 시작
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const auth = getAuth(app); // 로그인 담당관
+const auth = getAuth(app);
 
-// HTML 요소들 가져오기
+// HTML 요소들
 const loginBtn = document.getElementById('login-btn');
 const logoutBtn = document.getElementById('logout-btn');
 const userInfo = document.getElementById('user-info');
@@ -27,97 +27,104 @@ const todoList = document.getElementById('todo-list');
 const addBtn = document.getElementById('add-btn');
 const todoInput = document.getElementById('todo-input');
 
-// 현재 로그인한 사용자 정보 담을 변수
 let currentUser = null;
 
 // ==========================================
-// 1. 로그인 & 로그아웃 기능
+// ★ 1. 로그인 결과 확인 (탐정 기능)
 // ==========================================
+// 페이지가 로드되자마자 "혹시 로그인하고 돌아온 사람인가?" 확인
+getRedirectResult(auth)
+    .then((result) => {
+        if (result) {
+            console.log("로그인 성공하고 돌아옴!", result.user);
+            // 여기서 굳이 뭘 안 해도 onAuthStateChanged가 처리해 줌
+        }
+    })
+    .catch((error) => {
+        console.error("로그인 하다가 에러 남:", error);
+        alert("로그인 실패 ㅠㅠ: " + error.message);
+    });
 
-// 로그인 버튼 누르면 구글 창 띄우기
-loginBtn.addEventListener('click', async () => {
-    const provider = new GoogleAuthProvider();
-    await signInWithRedirect(auth, provider);
-});
-// 로그아웃 버튼
-logoutBtn.addEventListener('click', () => {
-    signOut(auth);
-    todoList.innerHTML = ''; // 화면 비우기
-});
-
-// ★ 로그인 상태가 바뀔 때마다 실행되는 감시자
+// ==========================================
+// ★ 2. 로그인 상태 감지 (핵심!)
+// ==========================================
 onAuthStateChanged(auth, (user) => {
     if (user) {
-        // 로그인 성공했을 때
+        // 로그인 된 상태
+        console.log("현재 접속자:", user.displayName);
         currentUser = user;
         
         loginBtn.style.display = 'none';      // 로그인 버튼 숨기기
-        userInfo.style.display = 'block';     // 회원 정보 보여주기
-        todoContainer.style.display = 'block'; // 투두리스트 보여주기
+        userInfo.style.display = 'block';     // 정보 보여주기
+        todoContainer.style.display = 'block'; // 리스트 보여주기
         
-        userName.innerText = user.displayName; // 이름 표시
-        userPhoto.src = user.photoURL;         // 사진 표시
+        userName.innerText = user.displayName;
+        userPhoto.src = user.photoURL;
         
-        loadTodos(); // 내 글 불러오기!
+        loadTodos();
     } else {
-        // 로그아웃 했을 때
+        // 로그아웃 상태
+        console.log("로그인 안 됨");
         currentUser = null;
         
+        // ★ 중요: 확실히 로그아웃 상태일 때만 로그인 버튼을 보여줌
         loginBtn.style.display = 'block';
+        
         userInfo.style.display = 'none';
         todoContainer.style.display = 'none';
     }
 });
 
-// ==========================================
-// 2. 투두리스트 기능 (개인화 적용!)
-// ==========================================
+// 버튼 이벤트들
+loginBtn.addEventListener('click', () => {
+    // 버튼 누르면 로딩 중임을 표시 (버튼 텍스트 변경)
+    loginBtn.innerText = "구글로 이동 중...";
+    const provider = new GoogleAuthProvider();
+    signInWithRedirect(auth, provider);
+});
 
+logoutBtn.addEventListener('click', () => {
+    signOut(auth);
+    todoList.innerHTML = '';
+    loginBtn.innerText = "구글로 로그인"; // 텍스트 원상복구
+});
+
+// 투두리스트 기능들 (그대로 유지)
 async function loadTodos() {
     todoList.innerHTML = '';
-    
-    // ★ [핵심] 그냥 가져오는 게 아니라, 'uid'가 '내 아이디'랑 같은 것만 가져와! (Query)
     const q = query(collection(db, "todos"), where("uid", "==", currentUser.uid));
     const querySnapshot = await getDocs(q);
-    
     querySnapshot.forEach((doc) => {
         const data = doc.data();
         printTodo(data.text, doc.id);
     });
 }
 
-// 화면에 그리기 (이전과 동일)
 function printTodo(text, id) {
     const li = document.createElement('li');
     const span = document.createElement('span');
     span.innerText = text;
     const delBtn = document.createElement('button');
     delBtn.innerText = '❌';
-    
     delBtn.addEventListener('click', async function() {
         if (confirm("지울까요?")) {
             await deleteDoc(doc(db, "todos", id));
             li.remove();
         }
     });
-
     li.appendChild(span);
     li.appendChild(delBtn);
     todoList.appendChild(li);
 }
 
-// 추가하기 (저장할 때 꼬리표 붙이기)
 async function addTodo() {
     const text = todoInput.value;
     if (text === '') return;
-
-    // ★ 저장할 때 'uid: currentUser.uid'를 같이 저장함!
     const docRef = await addDoc(collection(db, "todos"), {
         text: text,
         isDone: false,
-        uid: currentUser.uid  // <--- 이게 바로 소유권 표시!
+        uid: currentUser.uid
     });
-    
     printTodo(text, docRef.id);
     todoInput.value = '';
 }
