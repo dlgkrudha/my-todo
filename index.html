@@ -1,22 +1,26 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <title>My First To-DO List</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="manifest" href="manifest.json">
-</head>
 <body>
     <div class="container">
-        <h1>My To-Do List</h1>
-        <div class="input-box">
-            <input type="text" id="todo-input" placeholder="할 일을 입력하세요">
-            <button id="add-btn">추가</button>
+        <header>
+            <h1>My Private To-Do 🔒</h1>
+            
+            <button id="login-btn">구글로 로그인</button>
+            
+            <div id="user-info" style="display: none;">
+                <img id="user-photo" src="" alt="프로필">
+                <span id="user-name"></span>님
+                <button id="logout-btn">로그아웃</button>
+            </div>
+        </header>
+
+        <div id="todo-container" style="display: none;">
+            <div class="input-box">
+                <input type="text" id="todo-input" placeholder="할 일을 입력하세요">
+                <button id="add-btn">추가</button>
+            </div>
+            <ul id="todo-list">
+                </ul>
         </div>
-        <ul id="todo-list">
-            </ul>
     </div>
 
     <script type="module" src="script.js"></script>
 </body>
-</html>

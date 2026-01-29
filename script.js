@@ -1,7 +1,8 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, doc, deleteDoc, query, where } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+// ★ 인증 기능 불러오기 (새로 추가됨!)
+import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 
-// 1. 파이어베이스 설정 (네 출입증 그대로)
 const firebaseConfig = {
   apiKey: "AIzaSyCqj8MRt3mTierFo2y7dwVNIczMIEIa4kk",
   authDomain: "my-first-todo-server.firebaseapp.com",
@@ -11,38 +12,94 @@ const firebaseConfig = {
   appId: "1:643667985855:web:444d298b565486c3c58d0a"
 };
 
-// 2. 연결 시작
+// 앱 시작
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app); // 로그인 담당관
 
-const todoInput = document.getElementById('todo-input');
-const addBtn = document.getElementById('add-btn');
+// HTML 요소들 가져오기
+const loginBtn = document.getElementById('login-btn');
+const logoutBtn = document.getElementById('logout-btn');
+const userInfo = document.getElementById('user-info');
+const todoContainer = document.getElementById('todo-container');
+const userName = document.getElementById('user-name');
+const userPhoto = document.getElementById('user-photo');
 const todoList = document.getElementById('todo-list');
+const addBtn = document.getElementById('add-btn');
+const todoInput = document.getElementById('todo-input');
 
-// 3. 화면에 그리기 함수 (삭제 기능 추가됨!)
-// id: 서버에 저장된 문서의 주민번호(ID)
+// 현재 로그인한 사용자 정보 담을 변수
+let currentUser = null;
+
+// ==========================================
+// 1. 로그인 & 로그아웃 기능
+// ==========================================
+
+// 로그인 버튼 누르면 구글 창 띄우기
+loginBtn.addEventListener('click', async () => {
+    const provider = new GoogleAuthProvider();
+    await signInWithPopup(auth, provider);
+});
+
+// 로그아웃 버튼
+logoutBtn.addEventListener('click', () => {
+    signOut(auth);
+    todoList.innerHTML = ''; // 화면 비우기
+});
+
+// ★ 로그인 상태가 바뀔 때마다 실행되는 감시자
+onAuthStateChanged(auth, (user) => {
+    if (user) {
+        // 로그인 성공했을 때
+        currentUser = user;
+        
+        loginBtn.style.display = 'none';      // 로그인 버튼 숨기기
+        userInfo.style.display = 'block';     // 회원 정보 보여주기
+        todoContainer.style.display = 'block'; // 투두리스트 보여주기
+        
+        userName.innerText = user.displayName; // 이름 표시
+        userPhoto.src = user.photoURL;         // 사진 표시
+        
+        loadTodos(); // 내 글 불러오기!
+    } else {
+        // 로그아웃 했을 때
+        currentUser = null;
+        
+        loginBtn.style.display = 'block';
+        userInfo.style.display = 'none';
+        todoContainer.style.display = 'none';
+    }
+});
+
+// ==========================================
+// 2. 투두리스트 기능 (개인화 적용!)
+// ==========================================
+
+async function loadTodos() {
+    todoList.innerHTML = '';
+    
+    // ★ [핵심] 그냥 가져오는 게 아니라, 'uid'가 '내 아이디'랑 같은 것만 가져와! (Query)
+    const q = query(collection(db, "todos"), where("uid", "==", currentUser.uid));
+    const querySnapshot = await getDocs(q);
+    
+    querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        printTodo(data.text, doc.id);
+    });
+}
+
+// 화면에 그리기 (이전과 동일)
 function printTodo(text, id) {
     const li = document.createElement('li');
-    
     const span = document.createElement('span');
     span.innerText = text;
-    
     const delBtn = document.createElement('button');
     delBtn.innerText = '❌';
     
-    // [중요] 삭제 버튼 클릭 시 실행될 코드
     delBtn.addEventListener('click', async function() {
-        if (confirm("진짜 지울까요?")) { // 실수로 누르는 거 방지
-            try {
-                // 1. 서버(DB)에서 삭제 명령: "todos 폴더에 있는 이 id를 가진 문서를 지워라!"
-                await deleteDoc(doc(db, "todos", id));
-                
-                // 2. 화면(HTML)에서도 삭제
-                li.remove();
-            } catch (e) {
-                console.error("삭제 실패:", e);
-                alert("삭제하다가 문제가 생겼어요 ㅠㅠ");
-            }
+        if (confirm("지울까요?")) {
+            await deleteDoc(doc(db, "todos", id));
+            li.remove();
         }
     });
 
@@ -51,49 +108,23 @@ function printTodo(text, id) {
     todoList.appendChild(li);
 }
 
-// 4. 데이터 불러오기
-async function loadTodos() {
-    todoList.innerHTML = ''; // 중복 방지 (기존 목록 싹 비우고 시작)
-    
-    const querySnapshot = await getDocs(collection(db, "todos"));
-    
-    querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        // doc.id : 파이어베이스가 자동으로 만들어준 신분증 번호
-        printTodo(data.text, doc.id);
-    });
-}
-
-// 5. 할 일 추가하기 함수 (기능 분리)
+// 추가하기 (저장할 때 꼬리표 붙이기)
 async function addTodo() {
     const text = todoInput.value;
     if (text === '') return;
 
-    try {
-        // 서버에 저장하고, 저장된 결과(참조)를 받아옴
-        const docRef = await addDoc(collection(db, "todos"), {
-            text: text,
-            isDone: false
-        });
-        
-        // 화면에 그릴 때, 방금 받은 따끈따끈한 ID(docRef.id)를 같이 넘겨줌
-        printTodo(text, docRef.id);
-        
-        todoInput.value = '';
-    } catch (e) {
-        console.error("에러 발생: ", e);
-    }
+    // ★ 저장할 때 'uid: currentUser.uid'를 같이 저장함!
+    const docRef = await addDoc(collection(db, "todos"), {
+        text: text,
+        isDone: false,
+        uid: currentUser.uid  // <--- 이게 바로 소유권 표시!
+    });
+    
+    printTodo(text, docRef.id);
+    todoInput.value = '';
 }
 
-// 6. 버튼 클릭 이벤트
 addBtn.addEventListener('click', addTodo);
-
-// 7. [추가됨] 엔터 키 이벤트!
-todoInput.addEventListener('keypress', function(e) {
-    if (e.key === 'Enter') {
-        addTodo();
-    }
+todoInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') addTodo();
 });
-
-// 시작!
-loadTodos();
