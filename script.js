@@ -1,8 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getFirestore, collection, addDoc, getDocs, doc, deleteDoc, query, where } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 // ★ 인증 기능 불러오기 (새로 추가됨!)
-import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-
+import { getAuth, signInWithRedirect, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 const firebaseConfig = {
   apiKey: "AIzaSyCqj8MRt3mTierFo2y7dwVNIczMIEIa4kk",
   authDomain: "my-first-todo-server.firebaseapp.com",
@@ -38,9 +37,8 @@ let currentUser = null;
 // 로그인 버튼 누르면 구글 창 띄우기
 loginBtn.addEventListener('click', async () => {
     const provider = new GoogleAuthProvider();
-    await signInWithPopup(auth, provider);
+    await signInWithRedirect(auth, provider);
 });
-
 // 로그아웃 버튼
 logoutBtn.addEventListener('click', () => {
     signOut(auth);
