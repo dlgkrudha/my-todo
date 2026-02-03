@@ -1,7 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getFirestore, collection, addDoc, getDocs, doc, deleteDoc, query, where } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-// 팝업, 리다이렉트 둘 다 가져오기
-import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+// 리다이렉트 관련 코드 제거하고 팝업만 남김
+import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCqj8MRt3mTierFo2y7dwVNIczMIEIa4kk",
@@ -29,25 +29,7 @@ const todoInput = document.getElementById('todo-input');
 let currentUser = null;
 
 // ==========================================
-// ★ 1. 모바일인지 PC인지 확인하는 탐지기
-// ==========================================
-function isMobile() {
-    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-}
-
-// ==========================================
-// ★ 2. 모바일(Redirect)로 돌아왔을 때 처리
-// ==========================================
-getRedirectResult(auth).then((result) => {
-    if (result) {
-        console.log("모바일 로그인 복귀 성공!");
-    }
-}).catch((error) => {
-    console.error("로그인 에러:", error);
-});
-
-// ==========================================
-// ★ 3. 로그인 상태 감지 (화면 바꾸기)
+// ★ 로그인 상태 감지
 // ==========================================
 onAuthStateChanged(auth, (user) => {
     if (user) {
@@ -68,21 +50,15 @@ onAuthStateChanged(auth, (user) => {
 });
 
 // ==========================================
-// ★ 4. 로그인 버튼 하나로 PC/모바일 자동 구분!
+// ★ 버튼 클릭: PC든 폰이든 무조건 "팝업"으로 통일!
 // ==========================================
 loginBtn.addEventListener('click', async () => {
     const provider = new GoogleAuthProvider();
-    
-    if (isMobile()) {
-        // [폰] 페이지 이동 방식
-        await signInWithRedirect(auth, provider);
-    } else {
-        // [컴퓨터] 팝업 창 방식 (영상 문제 해결사!)
-        try {
-            await signInWithPopup(auth, provider);
-        } catch (error) {
-            alert("PC 로그인 실패: " + error.message);
-        }
+    try {
+        // 폰에서도 이 방식이 훨씬 안전해 (기억 상실 방지)
+        await signInWithPopup(auth, provider);
+    } catch (error) {
+        alert("로그인 실패: " + error.message);
     }
 });
 
@@ -91,7 +67,7 @@ logoutBtn.addEventListener('click', () => {
     todoList.innerHTML = '';
 });
 
-// 투두리스트 기능 (기존 유지)
+// 투두리스트 기능
 async function loadTodos() {
     todoList.innerHTML = '';
     const q = query(collection(db, "todos"), where("uid", "==", currentUser.uid));
