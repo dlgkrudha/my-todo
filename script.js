@@ -1,7 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getFirestore, collection, addDoc, getDocs, doc, deleteDoc, query, where } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-// getRedirectResult 추가됨!
-import { getAuth, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+// 팝업, 리다이렉트 둘 다 가져오기
+import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCqj8MRt3mTierFo2y7dwVNIczMIEIa4kk",
@@ -16,7 +16,6 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-// HTML 요소들
 const loginBtn = document.getElementById('login-btn');
 const logoutBtn = document.getElementById('logout-btn');
 const userInfo = document.getElementById('user-info');
@@ -30,66 +29,69 @@ const todoInput = document.getElementById('todo-input');
 let currentUser = null;
 
 // ==========================================
-// ★ 1. 로그인 결과 확인 (탐정 기능)
+// ★ 1. 모바일인지 PC인지 확인하는 탐지기
 // ==========================================
-// 페이지가 로드되자마자 "혹시 로그인하고 돌아온 사람인가?" 확인
-getRedirectResult(auth)
-    .then((result) => {
-        if (result) {
-            console.log("로그인 성공하고 돌아옴!", result.user);
-            // 여기서 굳이 뭘 안 해도 onAuthStateChanged가 처리해 줌
-        }
-    })
-    .catch((error) => {
-        console.error("로그인 하다가 에러 남:", error);
-        alert("로그인 실패 ㅠㅠ: " + error.message);
-    });
+function isMobile() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
 
 // ==========================================
-// ★ 2. 로그인 상태 감지 (핵심!)
+// ★ 2. 모바일(Redirect)로 돌아왔을 때 처리
+// ==========================================
+getRedirectResult(auth).then((result) => {
+    if (result) {
+        console.log("모바일 로그인 복귀 성공!");
+    }
+}).catch((error) => {
+    console.error("로그인 에러:", error);
+});
+
+// ==========================================
+// ★ 3. 로그인 상태 감지 (화면 바꾸기)
 // ==========================================
 onAuthStateChanged(auth, (user) => {
     if (user) {
-        // 로그인 된 상태
-        console.log("현재 접속자:", user.displayName);
         currentUser = user;
-        
-        loginBtn.style.display = 'none';      // 로그인 버튼 숨기기
-        userInfo.style.display = 'block';     // 정보 보여주기
-        todoContainer.style.display = 'block'; // 리스트 보여주기
+        loginBtn.style.display = 'none';
+        userInfo.style.display = 'block';
+        todoContainer.style.display = 'block';
         
         userName.innerText = user.displayName;
         userPhoto.src = user.photoURL;
-        
         loadTodos();
     } else {
-        // 로그아웃 상태
-        console.log("로그인 안 됨");
         currentUser = null;
-        
-        // ★ 중요: 확실히 로그아웃 상태일 때만 로그인 버튼을 보여줌
         loginBtn.style.display = 'block';
-        
         userInfo.style.display = 'none';
         todoContainer.style.display = 'none';
     }
 });
 
-// 버튼 이벤트들
-loginBtn.addEventListener('click', () => {
-    // 버튼 누르면 로딩 중임을 표시 (버튼 텍스트 변경)
-    loginBtn.innerText = "구글로 이동 중...";
+// ==========================================
+// ★ 4. 로그인 버튼 하나로 PC/모바일 자동 구분!
+// ==========================================
+loginBtn.addEventListener('click', async () => {
     const provider = new GoogleAuthProvider();
-    signInWithRedirect(auth, provider);
+    
+    if (isMobile()) {
+        // [폰] 페이지 이동 방식
+        await signInWithRedirect(auth, provider);
+    } else {
+        // [컴퓨터] 팝업 창 방식 (영상 문제 해결사!)
+        try {
+            await signInWithPopup(auth, provider);
+        } catch (error) {
+            alert("PC 로그인 실패: " + error.message);
+        }
+    }
 });
 
 logoutBtn.addEventListener('click', () => {
     signOut(auth);
     todoList.innerHTML = '';
-    loginBtn.innerText = "구글로 로그인"; // 텍스트 원상복구
 });
 
-// 투두리스트 기능들 (그대로 유지)
+// 투두리스트 기능 (기존 유지)
 async function loadTodos() {
     todoList.innerHTML = '';
     const q = query(collection(db, "todos"), where("uid", "==", currentUser.uid));
